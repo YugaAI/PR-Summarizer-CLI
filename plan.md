@@ -205,7 +205,7 @@ Tujuan fase ini: buktikan pipeline end-to-end jalan dan value dasarnya kerasa (r
 
 ### 4.1 Task list
 
-- [ ] `internal/classifier/risk.go`:
+- [x] `internal/classifier/risk.go`:
   ```go
   package classifier
 
@@ -223,8 +223,8 @@ Tujuan fase ini: buktikan pipeline end-to-end jalan dan value dasarnya kerasa (r
   func Classify(files []domain.DiffFile, rules RiskRules) []domain.DiffFile
   ```
   **Acceptance criteria**: pure function, tidak ada I/O di `Classify` (I/O cuma di `LoadRules`). File yang tidak match rule apapun default ke `RiskLevel` kosong/medium — putuskan default ini secara eksplisit dan tulis di komentar kode.
-- [ ] `internal/classifier/risk_test.go` — table-driven test, minimal cover: file match high, file match low, file tidak match apapun, path dengan wildcard nested (`internal/auth/handler/login.go` harus match `**/auth/**`).
-- [ ] `internal/repository/diff/extractor.go`:
+- [x] `internal/classifier/risk_test.go` — table-driven test, minimal cover: file match high, file match low, file tidak match apapun, path dengan wildcard nested (`internal/auth/handler/login.go` harus match `**/auth/**`).
+- [x] `internal/repository/diff/extractor.go`:
   ```go
   package diff
 
@@ -232,8 +232,8 @@ Tujuan fase ini: buktikan pipeline end-to-end jalan dan value dasarnya kerasa (r
       Extract(ctx context.Context) ([]domain.DiffFile, error)
   }
   ```
-- [ ] `internal/repository/diff/git_extractor.go` — implementasi via `os/exec` manggil `git diff base...head --name-status` lalu `git diff base...head` untuk content. **Acceptance criteria**: pakai three-dot diff (bukan two-dot), robust terhadap file yang di-rename (status `R`).
-- [ ] `internal/chunker/chunker.go`:
+- [x] `internal/repository/diff/git_extractor.go` — implementasi via `os/exec` manggil `git diff base...head --name-status` lalu `git diff base...head` untuk content. **Acceptance criteria**: pakai three-dot diff (bukan two-dot), robust terhadap file yang di-rename (status `R`).
+- [x] `internal/chunker/chunker.go`:
   ```go
   package chunker
 
@@ -242,7 +242,7 @@ Tujuan fase ini: buktikan pipeline end-to-end jalan dan value dasarnya kerasa (r
   }
   ```
   Fase ini chunker cukup 1:1 (satu file = satu chunk), token budget belum dipakai — logic budget masuk fase 4.
-- [ ] `internal/repository/vcs/client.go`:
+- [x] `internal/repository/vcs/client.go`:
   ```go
   package vcs
 
@@ -250,8 +250,8 @@ Tujuan fase ini: buktikan pipeline end-to-end jalan dan value dasarnya kerasa (r
       PostOrUpdateComment(ctx context.Context, prNumber int, body string) error
   }
   ```
-- [ ] `internal/repository/vcs/github_client.go` — pakai `github.com/google/go-github/v66`. **Acceptance criteria**: idempotent — cari comment existing dengan marker `<!-- pr-summarizer-bot -->` di awal body, `PATCH` kalau ketemu, `POST` kalau belum ada.
-- [ ] `internal/usecase/summarize.go` — versi awal tanpa LLM/cache (interface LLM & Cache di-inject tapi boleh no-op implementation dulu):
+- [x] `internal/repository/vcs/github_client.go` — pakai `github.com/google/go-github/v66`. **Acceptance criteria**: idempotent — cari comment existing dengan marker `<!-- pr-summarizer-bot -->` di awal body, `PATCH` kalau ketemu, `POST` kalau belum ada.
+- [x] `internal/usecase/summarize.go` — versi awal tanpa LLM/cache (interface LLM & Cache di-inject tapi boleh no-op implementation dulu):
   ```go
   type Summarizer struct {
       extractor  diff.DiffExtractor
@@ -264,8 +264,8 @@ Tujuan fase ini: buktikan pipeline end-to-end jalan dan value dasarnya kerasa (r
 
   func (s *Summarizer) Run(ctx context.Context, prNumber int) error
   ```
-- [ ] `internal/usecase/summarize_test.go` — mock `DiffExtractor` dan `VCSClient`, assert `Run` menghasilkan comment body yang mengandung marker dan risk count yang benar.
-- [ ] `.github/workflows/pr-summary.yml` — versi minimal (lihat 4.2).
+- [x] `internal/usecase/summarize_test.go` — mock `DiffExtractor` dan `VCSClient`, assert `Run` menghasilkan comment body yang mengandung marker dan risk count yang benar.
+- [x] `.github/workflows/pr-summary.yml` — versi minimal (lihat 4.2).
 
 ### 4.2 CI Workflow (versi fase 2)
 
@@ -309,10 +309,10 @@ jobs:
 
 ### 4.3 Definition of Done Fase 2
 
-- [ ] Buka PR test (boleh PR dummy di repo test), comment otomatis muncul berisi: daftar file berubah + risk tag per file.
-- [ ] Push kedua ke branch yang sama → comment ter-**update**, bukan comment baru (validasi idempotency).
-- [ ] Push ke PR dari branch yang menyentuh file di `configs/risk_rules.yaml` pattern high → comment menunjukkan `HighRiskCount > 0`.
-- [ ] Unit test `classifier` dan `usecase` lulus di CI (`go test ./...`).
+- [ ] Buka PR test (boleh PR dummy di repo test), comment otomatis muncul berisi: daftar file berubah + risk tag per file. *(butuh PR sungguhan di GitHub — belum divalidasi end-to-end)*
+- [ ] Push kedua ke branch yang sama → comment ter-**update**, bukan comment baru (validasi idempotency). *(logic idempotent sudah diimplementasi di `github_client.go`, belum divalidasi live)*
+- [ ] Push ke PR dari branch yang menyentuh file di `configs/risk_rules.yaml` pattern high → comment menunjukkan `HighRiskCount > 0`. *(sudah dicover unit test `usecase`, belum divalidasi live)*
+- [x] Unit test `classifier` dan `usecase` lulus di CI (`go test ./...`).
 
 ---
 
@@ -514,6 +514,7 @@ Isi tabel ini setiap kali ada keputusan yang menyimpang dari asumsi awal di plan
 | Tanggal | Keputusan | Alasan |
 |---|---|---|
 | 2026-07-31 | Module path final: `github.com/YugaAI/PR-Summarizer-CLI`, bukan asumsi `pr-summarizer`. | Mengikuti nama repo GitHub aktual (`origin` remote: `github.com/YugaAI/PR-Summarizer-CLI`) sesuai §10.1. Nama folder/package di internal (`cmd/pr-summarizer`, dst.) tetap seperti di plan — hanya module path root yang berubah. |
+| 2026-07-31 | CI workflow (§4.2): `GITHUB_BASE_REF` diisi `origin/${{ github.base_ref }}` (bukan `${{ github.base_ref }}` polos), `GITHUB_HEAD_REF` diisi literal `HEAD` (bukan `${{ github.head_ref }}`). `go-version` di `actions/setup-go` dinaikkan ke `1.25` (bukan `1.23`). | `actions/checkout` untuk event `pull_request` checkout PR head secara detached — branch base tidak ada sebagai local branch bernama itu, cuma tersedia sebagai `origin/<base>`; `git diff <base>...<head>` akan gagal kalau `<base>` bukan ref yang valid secara lokal. Ini juga konsisten dengan draf brainstorming awal (`git diff origin/base...HEAD`). `go-version` dinaikkan karena `go.mod` sudah mencatat `go 1.25.2` (toolchain lokal saat `go mod init`), lebih baru dari asumsi `1.23` di draf. |
 | 2026-07-31 | Rate limit `mimo-v2.5-pro`: 100 RPM / 10.000.000 TPM per akun (agregat semua API key). Pricing overseas: input cache-miss $0.435/M, input cache-hit $0.0036/M (~120x lebih murah), output $0.87/M. Cache write gratis untuk waktu terbatas (bisa berubah). | Dicek langsung dari `mimo.mi.com/docs/en-US/api/guidance/rate-limit` dan `.../price/pay-as-you-go`, update terakhir per dokumentasi: Juni-Juli 2026. `LLM_CONCURRENCY` default 3 dikonfirmasi aman jauh di bawah limit 100 RPM — tidak perlu disesuaikan. Prioritas cache di Fase 4 naik karena selisih harga cache-hit vs cache-miss besar. |
 
 ---
