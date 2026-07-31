@@ -1,0 +1,8 @@
+patterns:
+  - "**/go.sum"
+  - "**/package-lock.json"
+  - "**/yarn.lock"
+  - "**/pnpm-lock.yaml"
+  - "**/vendor/**"
+  - "**/*.pb.go"
+  - "**/*.min.js"

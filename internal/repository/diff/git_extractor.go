@@ -48,6 +48,17 @@ func (g *GitExtractor) Extract(ctx context.Context) ([]domain.DiffFile, error) {
 	return files, nil
 }
 
+// HasMeaningfulChanges reports whether `git diff -w` (ignoring whitespace)
+// between BaseRef and HeadRef produces any output.
+func (g *GitExtractor) HasMeaningfulChanges(ctx context.Context) (bool, error) {
+	rangeSpec := g.BaseRef + "..." + g.HeadRef
+	out, err := runGit(ctx, "diff", "-w", rangeSpec)
+	if err != nil {
+		return false, fmt.Errorf("git diff -w: %w", err)
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
 func runGit(ctx context.Context, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	var out strings.Builder
