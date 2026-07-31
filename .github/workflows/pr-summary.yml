@@ -30,4 +30,4 @@ jobs:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPO_NAME: ${{ github.event.repository.name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          MIMO_API_KEY: "unused-in-phase-2"
+          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
