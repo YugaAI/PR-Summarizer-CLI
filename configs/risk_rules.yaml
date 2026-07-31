@@ -1,0 +1,23 @@
+high:
+  - pattern: "**/migrations/**"
+    reason: "database schema change"
+  - pattern: "**/auth/**"
+    reason: "authentication/authorization logic"
+  - pattern: "**/payment/**"
+    reason: "payment logic"
+medium:
+  - pattern: "**/middleware/**"
+    reason: "cross-cutting request handling"
+  - pattern: "go.mod"
+    reason: "dependency change"
+  - pattern: "go.sum"
+    reason: "dependency lockfile"
+low:
+  - pattern: "**/*_test.go"
+    reason: "test file"
+  - pattern: "**/mocks/**"
+    reason: "generated mock"
+  - pattern: "**/*.pb.go"
+    reason: "generated protobuf code"
+  - pattern: "docs/**"
+    reason: "documentation"

@@ -1,0 +1,13 @@
+.PHONY: build test lint mocks
+
+build:
+	go build ./...
+
+test:
+	go test ./...
+
+lint:
+	go vet ./...
+
+mocks:
+	go generate ./...

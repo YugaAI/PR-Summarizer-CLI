@@ -1,0 +1,5 @@
+.env
+.idea/
+.pr-summary-cache/
+/pr-summarizer
+/pr-summarizer.exe
