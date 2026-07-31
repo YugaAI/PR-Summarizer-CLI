@@ -9,8 +9,8 @@ import (
 type Config struct {
 	GitHubToken      string        `env:"GITHUB_TOKEN,required"`
 	MimoAPIKey       string        `env:"MIMO_API_KEY,required"`
-	BaseRef          string        `env:"GITHUB_BASE_REF,required"`
-	HeadRef          string        `env:"GITHUB_HEAD_REF,required"`
+	BaseRef          string        `env:"DIFF_BASE_REF,required"`
+	HeadRef          string        `env:"DIFF_HEAD_REF,required"`
 	RepoOwner        string        `env:"GITHUB_REPOSITORY_OWNER,required"`
 	RepoName         string        `env:"GITHUB_REPO_NAME,required"`
 	PRNumber         int           `env:"PR_NUMBER,required"`
