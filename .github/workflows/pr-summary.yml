@@ -32,8 +32,8 @@ jobs:
       - run: ./pr-summarizer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_BASE_REF: origin/${{ github.base_ref }}
-          GITHUB_HEAD_REF: HEAD
+          DIFF_BASE_REF: origin/${{ github.base_ref }}
+          DIFF_HEAD_REF: HEAD
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPO_NAME: ${{ github.event.repository.name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

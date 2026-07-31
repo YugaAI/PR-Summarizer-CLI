@@ -4,8 +4,8 @@ import "testing"
 
 func TestLoad_MissingGitHubToken(t *testing.T) {
 	t.Setenv("MIMO_API_KEY", "x")
-	t.Setenv("GITHUB_BASE_REF", "main")
-	t.Setenv("GITHUB_HEAD_REF", "feature")
+	t.Setenv("DIFF_BASE_REF", "main")
+	t.Setenv("DIFF_HEAD_REF", "feature")
 	t.Setenv("GITHUB_REPOSITORY_OWNER", "owner")
 	t.Setenv("GITHUB_REPO_NAME", "repo")
 	t.Setenv("PR_NUMBER", "1")
@@ -18,8 +18,8 @@ func TestLoad_MissingGitHubToken(t *testing.T) {
 func TestLoad_AllRequiredPresent(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "token")
 	t.Setenv("MIMO_API_KEY", "x")
-	t.Setenv("GITHUB_BASE_REF", "main")
-	t.Setenv("GITHUB_HEAD_REF", "feature")
+	t.Setenv("DIFF_BASE_REF", "main")
+	t.Setenv("DIFF_HEAD_REF", "feature")
 	t.Setenv("GITHUB_REPOSITORY_OWNER", "owner")
 	t.Setenv("GITHUB_REPO_NAME", "repo")
 	t.Setenv("PR_NUMBER", "1")
