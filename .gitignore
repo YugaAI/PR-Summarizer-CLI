@@ -3,3 +3,5 @@
 .pr-summary-cache/
 /pr-summarizer
 /pr-summarizer.exe
+/precommit-guard
+/precommit-guard.exe
