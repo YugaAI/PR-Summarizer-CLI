@@ -28,6 +28,11 @@ type MimoClient struct {
 func NewMimoClient(apiKey string, timeout time.Duration, logger zerolog.Logger) *MimoClient {
 	client := anthropic.NewClient(
 		option.WithBaseURL(mimoBaseURL),
+		// WithAPIKey satisfies the SDK's own client-side credential-presence
+		// check (it sets X-Api-Key too, which MiMo ignores); WithHeader
+		// after it is what actually authenticates against MiMo's endpoint,
+		// which expects the literal header name "api-key", not "X-Api-Key".
+		option.WithAPIKey(apiKey),
 		option.WithHeader("api-key", apiKey),
 	)
 	return &MimoClient{client: client, timeout: timeout, logger: logger}
