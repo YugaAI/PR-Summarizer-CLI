@@ -320,7 +320,7 @@ jobs:
 
 ### 5.1 Task list
 
-- [ ] `internal/repository/llm/summarizer.go`:
+- [x] `internal/repository/llm/summarizer.go`:
   ```go
   package llm
 
@@ -328,9 +328,9 @@ jobs:
       Summarize(ctx context.Context, chunk domain.DiffChunk) (domain.FileSummary, error)
   }
   ```
-- [ ] Generate mock: tambahkan `//go:generate mockgen -source=summarizer.go -destination=mock_summarizer.go -package=llm` di atas `summarizer.go`, jalankan `make mocks`.
-- [ ] `internal/repository/llm/mimo_client.go` — implementasi sesuai draf yang sudah direview (lihat bagian 5.2). **Sebelum dipakai di CI, wajib lolos Task Validasi 5.3 dulu.**
-- [ ] Update `internal/usecase/summarize.go`: inject `LLMSummarizer`, tambahkan logic fallback:
+- [x] Generate mock: tambahkan `//go:generate mockgen -source=summarizer.go -destination=mock_summarizer.go -package=llm` di atas `summarizer.go`, jalankan `make mocks`.
+- [x] `internal/repository/llm/mimo_client.go` — implementasi sesuai draf yang sudah direview (lihat bagian 5.2). **Sebelum dipakai di CI, wajib lolos Task Validasi 5.3 dulu.**
+- [x] Update `internal/usecase/summarize.go`: inject `LLMSummarizer`, tambahkan logic fallback:
   ```go
   summary, err := s.llm.Summarize(ctx, chunk)
   if err != nil {
@@ -338,9 +338,9 @@ jobs:
       summary = heuristicFallback(chunk) // FromLLM: false
   }
   ```
-- [ ] `heuristicFallback(chunk)` — fungsi baru di `usecase/`, hasilnya minimal: `Summary: "<risk> risk change in <file>"`, `Category` ditebak dari conventional commit prefix kalau ada, kalau tidak default `"chore"`.
-- [ ] Concurrency: worker pool di `usecase.Run` dengan limit dari `cfg.Concurrency` (default 3) — pakai `golang.org/x/sync/errgroup` dengan `SetLimit`.
-- [ ] Update CI workflow: isi `MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}` beneran, tambahkan secret di repo settings.
+- [x] `heuristicFallback(chunk)` — fungsi baru di `usecase/`, hasilnya minimal: `Summary: "<risk> risk change in <file>"`, `Category` ditebak dari conventional commit prefix kalau ada, kalau tidak default `"chore"`.
+- [x] Concurrency: worker pool di `usecase.Run` dengan limit dari `cfg.Concurrency` (default 3) — pakai `golang.org/x/sync/errgroup` dengan `SetLimit`.
+- [x] Update CI workflow: isi `MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}` beneran. *(nilai env sudah diisi; task menambahkan secret asli di repo GitHub settings tetap perlu dilakukan manual oleh pemilik repo.)*
 
 ### 5.2 Spesifikasi `mimo_client.go` (final, siap-implement)
 
@@ -438,16 +438,16 @@ func parseStructuredOutput(resp *anthropic.Message, chunk domain.DiffChunk) (dom
 
 ### 5.3 Task Validasi Wajib (sebelum masuk CI production)
 
-- [ ] **Test auth header manual** — buat 1 script/test kecil terpisah (`cmd/mimo-smoke-test/main.go`, boleh dihapus setelah divalidasi) yang manggil `Messages.New` dengan API key asli, pastikan tidak 401. Kalau 401, coba ganti pendekatan header (`option.WithAPIKey` vs `option.WithHeader` manual) sampai jelas mana yang benar-benar dipakai SDK.
-- [ ] **Test fallback path** — matikan network / pakai API key salah sengaja, pastikan `usecase.Run` tetap menghasilkan comment (via `heuristicFallback`), tidak crash, tidak bikin CI job merah.
-- [ ] **Test markdown fence stripping** — kirim prompt yang sengaja memancing model membalas dengan ```` ```json ```` wrapper, pastikan parser tetap berhasil.
-- [ ] **Cek rate limit resmi** — buka `https://mimo.mi.com/docs/en-US/api/guidance/rate-limit` dan `.../price/pay-as-you-go`, catat angka rate limit & pricing di bagian 9 (Decision Log), sesuaikan `LLM_CONCURRENCY` default kalau perlu.
+- [ ] **Test auth header manual** — buat 1 script/test kecil terpisah (`cmd/mimo-smoke-test/main.go`, boleh dihapus setelah divalidasi) yang manggil `Messages.New` dengan API key asli, pastikan tidak 401. Kalau 401, coba ganti pendekatan header (`option.WithAPIKey` vs `option.WithHeader` manual) sampai jelas mana yang benar-benar dipakai SDK. *(Tool sudah dibuat & compile; belum dieksekusi — butuh `MIMO_API_KEY` asli dan ini memanggil layanan eksternal berbayar, jadi sengaja tidak dijalankan otomatis. Jalankan manual: `MIMO_API_KEY=xxx go run ./cmd/mimo-smoke-test`.)*
+- [x] **Test fallback path** — tervalidasi di level unit test (`usecase.TestRun_FallsBackToHeuristicWhenLLMFails`, LLM di-mock gagal) — `Run` tetap post comment via `heuristicFallback`, tidak error. Validasi live (API key salah beneran lewat `mimo_client`) belum dilakukan, lihat item di atas.
+- [x] **Test markdown fence stripping** — `llm.TestParseStructuredOutput_StripsMarkdownFence` mengirim response yang dibungkus ```` ```json ```` dan memverifikasi parser tetap berhasil. Tidak butuh network karena `parseStructuredOutput` pure function.
+- [x] **Cek rate limit resmi** — sudah diselesaikan sebelumnya, lihat Decision Log baris 2026-07-31 (rate limit 100 RPM / 10M TPM) dan §10.3.
 
 ### 5.4 Definition of Done Fase 3
 
-- [ ] Comment di PR test berisi narasi ringkasan per file (bukan cuma risk tag mentah).
-- [ ] Simulasi API key salah tetap menghasilkan comment (fallback jalan, ada log warning, CI job tidak gagal karena ini).
-- [ ] Concurrency limit teruji tidak melebihi `LLM_CONCURRENCY` (bisa divalidasi via log timestamp overlap).
+- [ ] Comment di PR test berisi narasi ringkasan per file (bukan cuma risk tag mentah). *(butuh PR sungguhan + `MIMO_API_KEY` asli — belum divalidasi live)*
+- [x] Simulasi API key salah tetap menghasilkan comment (fallback jalan, ada log warning, CI job tidak gagal karena ini). *(tervalidasi di level unit test; validasi live dengan `mimo_client` + API key salah beneran masih pending, lihat 5.3)*
+- [x] Concurrency limit teruji tidak melebihi `LLM_CONCURRENCY` (`usecase.TestRun_RespectsConcurrencyLimit` — 20 chunk, limit 3, deterministic via in-process counter bukan log timestamp).
 
 ---
 
@@ -514,6 +514,7 @@ Isi tabel ini setiap kali ada keputusan yang menyimpang dari asumsi awal di plan
 | Tanggal | Keputusan | Alasan |
 |---|---|---|
 | 2026-07-31 | Module path final: `github.com/YugaAI/PR-Summarizer-CLI`, bukan asumsi `pr-summarizer`. | Mengikuti nama repo GitHub aktual (`origin` remote: `github.com/YugaAI/PR-Summarizer-CLI`) sesuai §10.1. Nama folder/package di internal (`cmd/pr-summarizer`, dst.) tetap seperti di plan — hanya module path root yang berubah. |
+| 2026-07-31 | Mock tool: `go.uber.org/mock/mockgen` (via `go get -tool`, Go 1.24+ tool directive), bukan `github.com/golang/mock` yang disebut generik sebagai "mockgen" di draf. | `golang/mock` sudah archived/deprecated, `go.uber.org/mock` adalah kelanjutan resminya dengan CLI & API yang kompatibel (drop-in). `tool` directive dipakai (bukan `require` biasa) supaya jelas ini dependency build-time untuk codegen, bukan runtime dependency binary. `go:generate` directive pakai `go tool mockgen` (bukan `go run go.uber.org/mock/mockgen`) untuk konsisten dengan pola tool directive ini. |
 | 2026-07-31 | CI workflow (§4.2): `GITHUB_BASE_REF` diisi `origin/${{ github.base_ref }}` (bukan `${{ github.base_ref }}` polos), `GITHUB_HEAD_REF` diisi literal `HEAD` (bukan `${{ github.head_ref }}`). `go-version` di `actions/setup-go` dinaikkan ke `1.25` (bukan `1.23`). | `actions/checkout` untuk event `pull_request` checkout PR head secara detached — branch base tidak ada sebagai local branch bernama itu, cuma tersedia sebagai `origin/<base>`; `git diff <base>...<head>` akan gagal kalau `<base>` bukan ref yang valid secara lokal. Ini juga konsisten dengan draf brainstorming awal (`git diff origin/base...HEAD`). `go-version` dinaikkan karena `go.mod` sudah mencatat `go 1.25.2` (toolchain lokal saat `go mod init`), lebih baru dari asumsi `1.23` di draf. |
 | 2026-07-31 | Rate limit `mimo-v2.5-pro`: 100 RPM / 10.000.000 TPM per akun (agregat semua API key). Pricing overseas: input cache-miss $0.435/M, input cache-hit $0.0036/M (~120x lebih murah), output $0.87/M. Cache write gratis untuk waktu terbatas (bisa berubah). | Dicek langsung dari `mimo.mi.com/docs/en-US/api/guidance/rate-limit` dan `.../price/pay-as-you-go`, update terakhir per dokumentasi: Juni-Juli 2026. `LLM_CONCURRENCY` default 3 dikonfirmasi aman jauh di bawah limit 100 RPM — tidak perlu disesuaikan. Prioritas cache di Fase 4 naik karena selisih harga cache-hit vs cache-miss besar. |
 
