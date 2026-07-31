@@ -17,11 +17,16 @@ import (
 )
 
 type fakeExtractor struct {
-	files []domain.DiffFile
+	files      []domain.DiffFile
+	meaningful bool
 }
 
 func (f *fakeExtractor) Extract(ctx context.Context) ([]domain.DiffFile, error) {
 	return f.files, nil
+}
+
+func (f *fakeExtractor) HasMeaningfulChanges(ctx context.Context) (bool, error) {
+	return f.meaningful, nil
 }
 
 type fakeVCS struct {
@@ -59,8 +64,31 @@ func (f *fakeLLM) Summarize(ctx context.Context, chunk domain.DiffChunk) (domain
 	}, nil
 }
 
+type fakeCache struct {
+	mu   sync.Mutex
+	data map[string]domain.FileSummary
+}
+
+func newFakeCache() *fakeCache {
+	return &fakeCache{data: make(map[string]domain.FileSummary)}
+}
+
+func (f *fakeCache) Get(ctx context.Context, key string) (domain.FileSummary, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	v, ok := f.data[key]
+	return v, ok
+}
+
+func (f *fakeCache) Set(ctx context.Context, key string, value domain.FileSummary) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.data[key] = value
+	return nil
+}
+
 func TestRun_PostsCommentWithMarkerAndRiskCount(t *testing.T) {
-	extractor := &fakeExtractor{files: []domain.DiffFile{
+	extractor := &fakeExtractor{meaningful: true, files: []domain.DiffFile{
 		{Path: "internal/auth/handler/login.go"},
 		{Path: "README.md"},
 	}}
@@ -70,7 +98,7 @@ func TestRun_PostsCommentWithMarkerAndRiskCount(t *testing.T) {
 	vcsClient := &fakeVCS{}
 	llmClient := &fakeLLM{}
 
-	s := NewSummarizer(extractor, classifier.Classify, rules, chunker.NewFileChunker(), llmClient, vcsClient, 3, zerolog.Nop())
+	s := NewSummarizer(extractor, classifier.Classify, rules, chunker.NewFileChunker(nil), llmClient, newFakeCache(), vcsClient, 3, zerolog.Nop())
 
 	if err := s.Run(context.Background(), 42); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -97,13 +125,13 @@ func TestRun_PostsCommentWithMarkerAndRiskCount(t *testing.T) {
 }
 
 func TestRun_FallsBackToHeuristicWhenLLMFails(t *testing.T) {
-	extractor := &fakeExtractor{files: []domain.DiffFile{
+	extractor := &fakeExtractor{meaningful: true, files: []domain.DiffFile{
 		{Path: "flaky.go"},
 	}}
 	vcsClient := &fakeVCS{}
 	llmClient := &fakeLLM{failPaths: map[string]bool{"flaky.go": true}}
 
-	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker(), llmClient, vcsClient, 3, zerolog.Nop())
+	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker(nil), llmClient, newFakeCache(), vcsClient, 3, zerolog.Nop())
 
 	if err := s.Run(context.Background(), 1); err != nil {
 		t.Fatalf("Run should not fail when LLM errors (fallback expected): %v", err)
@@ -148,12 +176,12 @@ func TestRun_RespectsConcurrencyLimit(t *testing.T) {
 	for i := range files {
 		files[i] = domain.DiffFile{Path: "file.go"}
 	}
-	extractor := &fakeExtractor{files: files}
+	extractor := &fakeExtractor{meaningful: true, files: files}
 	vcsClient := &fakeVCS{}
 	llmClient := &concurrencyTrackingLLM{}
 	const limit = 3
 
-	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker(), llmClient, vcsClient, limit, zerolog.Nop())
+	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker(nil), llmClient, newFakeCache(), vcsClient, limit, zerolog.Nop())
 
 	if err := s.Run(context.Background(), 1); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -168,5 +196,78 @@ func TestRun_RespectsConcurrencyLimit(t *testing.T) {
 	}
 	if maxSeen < limit {
 		t.Errorf("expected concurrency to reach the limit of %d with 20 chunks, only saw %d in flight", limit, maxSeen)
+	}
+}
+
+func TestRun_CacheHitSkipsLLMCall(t *testing.T) {
+	extractor := &fakeExtractor{meaningful: true, files: []domain.DiffFile{
+		{Path: "cached.go", Content: "same as last push"},
+	}}
+	vcsClient := &fakeVCS{}
+	llmClient := &fakeLLM{}
+	cacheImpl := newFakeCache()
+
+	chunk := domain.DiffChunk{FilePath: "cached.go", Content: "same as last push"}
+	cacheImpl.data[chunk.Hash()] = domain.FileSummary{
+		FilePath: "cached.go",
+		Summary:  "cached narrative",
+		Category: "feat",
+		FromLLM:  true,
+	}
+
+	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker(nil), llmClient, cacheImpl, vcsClient, 3, zerolog.Nop())
+
+	if err := s.Run(context.Background(), 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if llmClient.calls != 0 {
+		t.Errorf("expected 0 LLM calls on cache hit, got %d", llmClient.calls)
+	}
+	if !strings.Contains(vcsClient.body, "cached narrative") {
+		t.Errorf("expected cached summary in comment body, got: %s", vcsClient.body)
+	}
+}
+
+func TestRun_SkipPatternBypassesLLMCall(t *testing.T) {
+	extractor := &fakeExtractor{meaningful: true, files: []domain.DiffFile{
+		{Path: "go.sum", Content: "lockfile churn"},
+	}}
+	vcsClient := &fakeVCS{}
+	llmClient := &fakeLLM{}
+
+	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker([]string{"**/go.sum"}), llmClient, newFakeCache(), vcsClient, 3, zerolog.Nop())
+
+	if err := s.Run(context.Background(), 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if llmClient.calls != 0 {
+		t.Errorf("expected 0 LLM calls for skip-pattern file, got %d", llmClient.calls)
+	}
+	if !strings.Contains(vcsClient.body, "risk change in go.sum") {
+		t.Errorf("expected heuristic summary for skipped file, got: %s", vcsClient.body)
+	}
+}
+
+func TestRun_WhitespaceOnlyDiffSkipsAllLLMCalls(t *testing.T) {
+	extractor := &fakeExtractor{meaningful: false, files: []domain.DiffFile{
+		{Path: "a.go"},
+		{Path: "b.go"},
+	}}
+	vcsClient := &fakeVCS{}
+	llmClient := &fakeLLM{}
+
+	s := NewSummarizer(extractor, classifier.Classify, classifier.RiskRules{}, chunker.NewFileChunker(nil), llmClient, newFakeCache(), vcsClient, 3, zerolog.Nop())
+
+	if err := s.Run(context.Background(), 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if llmClient.calls != 0 {
+		t.Errorf("expected 0 LLM calls for whitespace-only diff, got %d", llmClient.calls)
+	}
+	if vcsClient.callCnt != 1 {
+		t.Fatalf("expected comment to still be posted, got %d calls", vcsClient.callCnt)
 	}
 }

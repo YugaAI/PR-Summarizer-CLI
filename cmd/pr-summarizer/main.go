@@ -10,6 +10,7 @@ import (
 	"github.com/YugaAI/PR-Summarizer-CLI/internal/chunker"
 	"github.com/YugaAI/PR-Summarizer-CLI/internal/classifier"
 	"github.com/YugaAI/PR-Summarizer-CLI/internal/config"
+	"github.com/YugaAI/PR-Summarizer-CLI/internal/repository/cache"
 	"github.com/YugaAI/PR-Summarizer-CLI/internal/repository/diff"
 	"github.com/YugaAI/PR-Summarizer-CLI/internal/repository/llm"
 	"github.com/YugaAI/PR-Summarizer-CLI/internal/repository/vcs"
@@ -27,13 +28,29 @@ func main() {
 		log.Fatalf("load risk rules: %v", err)
 	}
 
+	skipPatterns, err := chunker.LoadSkipPatterns(cfg.SkipPatternsPath)
+	if err != nil {
+		log.Fatalf("load skip patterns: %v", err)
+	}
+
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	extractor := diff.NewGitExtractor(cfg.BaseRef, cfg.HeadRef)
 	vcsClient := vcs.NewGitHubClient(cfg.GitHubToken, cfg.RepoOwner, cfg.RepoName)
 	llmClient := llm.NewMimoClient(cfg.MimoAPIKey, cfg.Timeout, logger)
+	localCache := cache.NewLocalCache(cfg.CacheDir)
 
-	summarizer := usecase.NewSummarizer(extractor, classifier.Classify, rules, chunker.NewFileChunker(), llmClient, vcsClient, cfg.Concurrency, logger)
+	summarizer := usecase.NewSummarizer(
+		extractor,
+		classifier.Classify,
+		rules,
+		chunker.NewFileChunker(skipPatterns),
+		llmClient,
+		localCache,
+		vcsClient,
+		cfg.Concurrency,
+		logger,
+	)
 
 	if err := summarizer.Run(context.Background(), cfg.PRNumber); err != nil {
 		log.Fatalf("run: %v", err)

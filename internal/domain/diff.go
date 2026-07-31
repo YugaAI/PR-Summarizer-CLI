@@ -25,6 +25,7 @@ type DiffChunk struct {
 	FilePath string
 	Content  string
 	Risk     RiskLevel
+	Skip     bool // true = low-value file (lockfile, generated code, vendor), bypass LLM entirely
 }
 
 func (c DiffChunk) Hash() string {

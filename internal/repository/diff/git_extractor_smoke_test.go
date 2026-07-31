@@ -34,3 +34,27 @@ func TestGitExtractor_RealRepoSmoke(t *testing.T) {
 		t.Fatal("expected plan.md in changed files")
 	}
 }
+
+// TestGitExtractor_HasMeaningfulChanges_RealRepoSmoke sanity-checks the
+// whitespace-only detection (plan.md Phase 4) against real git output: the
+// same non-trivial range must report true, and a zero-length range (base ==
+// head) must report false since there's nothing to diff at all.
+func TestGitExtractor_HasMeaningfulChanges_RealRepoSmoke(t *testing.T) {
+	e := NewGitExtractor("875ff24", "b272659")
+	meaningful, err := e.HasMeaningfulChanges(context.Background())
+	if err != nil {
+		t.Fatalf("HasMeaningfulChanges failed: %v", err)
+	}
+	if !meaningful {
+		t.Fatal("expected meaningful changes between 875ff24 and b272659")
+	}
+
+	same := NewGitExtractor("875ff24", "875ff24")
+	meaningful, err = same.HasMeaningfulChanges(context.Background())
+	if err != nil {
+		t.Fatalf("HasMeaningfulChanges failed: %v", err)
+	}
+	if meaningful {
+		t.Fatal("expected no meaningful changes when base == head")
+	}
+}

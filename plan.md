@@ -455,7 +455,7 @@ func parseStructuredOutput(resp *anthropic.Message, chunk domain.DiffChunk) (dom
 
 ### 6.1 Task list
 
-- [ ] `internal/repository/cache/cache.go`:
+- [x] `internal/repository/cache/cache.go`:
   ```go
   package cache
 
@@ -464,18 +464,18 @@ func parseStructuredOutput(resp *anthropic.Message, chunk domain.DiffChunk) (dom
       Set(ctx context.Context, key string, value domain.FileSummary) error
   }
   ```
-- [ ] `internal/repository/cache/local_cache.go` — implementasi file-based (JSON per key di `CacheDir`), key = `chunk.Hash()`.
-- [ ] Update `.github/workflows/pr-summary.yml`: tambahkan step `actions/cache@v4` dengan `path: .pr-summary-cache`, `key` berbasis PR number + fallback restore-key tanpa PR number (biar cache bisa reused lintas PR untuk file yang sama).
-- [ ] Update `chunker.Chunk`: file dengan pattern low-risk yang match daftar `skip_llm_patterns` (lockfile, generated code, vendor) langsung dapat `FileSummary` heuristic tanpa lewat LLM sama sekali — tambahkan field ini ke `risk_rules.yaml` atau file config terpisah `configs/skip_patterns.yaml`.
-- [ ] Tambahkan deteksi whitespace-only diff: kalau `git diff -w base...head` kosong, skip seluruh LLM call untuk PR itu, langsung heuristic-only comment.
-- [ ] Update `usecase.Run`: cek cache dulu sebelum manggil `llm.Summarize`, log cache hit/miss count ke `domain.PRSummary`.
-- [ ] Sematkan metrics ke comment (HTML comment tersembunyi): `<!-- tokens_used: N, cache_hit: X/Y -->`.
+- [x] `internal/repository/cache/local_cache.go` — implementasi file-based (JSON per key di `CacheDir`), key = `chunk.Hash()`.
+- [x] Update `.github/workflows/pr-summary.yml`: tambahkan step `actions/cache@v4` dengan `path: .pr-summary-cache`, `key` berbasis PR number + fallback restore-key tanpa PR number (biar cache bisa reused lintas PR untuk file yang sama).
+- [x] Update `chunker.Chunk`: file dengan pattern low-risk yang match daftar `skip_llm_patterns` (lockfile, generated code, vendor) langsung dapat `FileSummary` heuristic tanpa lewat LLM sama sekali — dipilih **file config terpisah** `configs/skip_patterns.yaml` (opsi kedua yang ditawarkan plan), supaya tidak campur dengan `risk_rules.yaml` yang isinya level risiko, bukan keputusan skip-LLM.
+- [x] Tambahkan deteksi whitespace-only diff: kalau `git diff -w base...head` kosong, skip seluruh LLM call untuk PR itu, langsung heuristic-only comment.
+- [x] Update `usecase.Run`: cek cache dulu sebelum manggil `llm.Summarize`, log cache hit/miss count ke `domain.PRSummary`.
+- [x] Sematkan metrics ke comment (HTML comment tersembunyi): `<!-- tokens_used: N, cache_hit: X/Y -->`. *(`cache_hit`/`cache_misses` sudah real; `tokens_used` masih selalu 0 — belum ada task eksplisit di fase ini untuk hitung token usage asli dari response MiMo, jadi sengaja tidak diimprovisasi. Dicatat sebagai gap, bukan silent placeholder.)*
 
 ### 6.2 Definition of Done Fase 4
 
-- [ ] Push kedua ke PR yang sama tanpa perubahan di sebagian besar file → cache hit rate terlihat di comment (via HTML comment metric).
-- [ ] PR yang cuma mengubah `go.sum` tidak memicu LLM call sama sekali (cek log — 0 call ke `Summarize`).
-- [ ] PR whitespace-only tidak memicu LLM call.
+- [ ] Push kedua ke PR yang sama tanpa perubahan di sebagian besar file → cache hit rate terlihat di comment (via HTML comment metric). *(logic cache sudah diimplementasi & diuji unit test; butuh PR sungguhan untuk validasi live)*
+- [x] PR yang cuma mengubah `go.sum` tidak memicu LLM call sama sekali (`usecase.TestRun_SkipPatternBypassesLLMCall`, 0 call ke `Summarize` terverifikasi).
+- [x] PR whitespace-only tidak memicu LLM call (`usecase.TestRun_WhitespaceOnlyDiffSkipsAllLLMCalls`, plus smoke test `HasMeaningfulChanges` terhadap history repo asli).
 
 ---
 
@@ -514,6 +514,7 @@ Isi tabel ini setiap kali ada keputusan yang menyimpang dari asumsi awal di plan
 | Tanggal | Keputusan | Alasan |
 |---|---|---|
 | 2026-07-31 | Module path final: `github.com/YugaAI/PR-Summarizer-CLI`, bukan asumsi `pr-summarizer`. | Mengikuti nama repo GitHub aktual (`origin` remote: `github.com/YugaAI/PR-Summarizer-CLI`) sesuai §10.1. Nama folder/package di internal (`cmd/pr-summarizer`, dst.) tetap seperti di plan — hanya module path root yang berubah. |
+| 2026-07-31 | Fase 4 menambahkan field yang tidak ada di spesifikasi struct final Fase 1/2: `domain.DiffChunk.Skip bool`, dan `config.Config.SkipPatternsPath string` (env `SKIP_PATTERNS_PATH`, default `configs/skip_patterns.yaml`). | Diperlukan supaya `chunker.Chunk` bisa menandai file low-value (lockfile/vendor/generated) untuk bypass LLM sama sekali sesuai task 6.1 — kapabilitas ini belum ada saat struct/config final ditulis di Fase 1, jadi bukan penyimpangan dari spesifikasi lama, tapi ekstensi wajar untuk kapabilitas baru yang memang diminta di fase ini. |
 | 2026-07-31 | Mock tool: `go.uber.org/mock/mockgen` (via `go get -tool`, Go 1.24+ tool directive), bukan `github.com/golang/mock` yang disebut generik sebagai "mockgen" di draf. | `golang/mock` sudah archived/deprecated, `go.uber.org/mock` adalah kelanjutan resminya dengan CLI & API yang kompatibel (drop-in). `tool` directive dipakai (bukan `require` biasa) supaya jelas ini dependency build-time untuk codegen, bukan runtime dependency binary. `go:generate` directive pakai `go tool mockgen` (bukan `go run go.uber.org/mock/mockgen`) untuk konsisten dengan pola tool directive ini. |
 | 2026-07-31 | CI workflow (§4.2): `GITHUB_BASE_REF` diisi `origin/${{ github.base_ref }}` (bukan `${{ github.base_ref }}` polos), `GITHUB_HEAD_REF` diisi literal `HEAD` (bukan `${{ github.head_ref }}`). `go-version` di `actions/setup-go` dinaikkan ke `1.25` (bukan `1.23`). | `actions/checkout` untuk event `pull_request` checkout PR head secara detached — branch base tidak ada sebagai local branch bernama itu, cuma tersedia sebagai `origin/<base>`; `git diff <base>...<head>` akan gagal kalau `<base>` bukan ref yang valid secara lokal. Ini juga konsisten dengan draf brainstorming awal (`git diff origin/base...HEAD`). `go-version` dinaikkan karena `go.mod` sudah mencatat `go 1.25.2` (toolchain lokal saat `go mod init`), lebih baru dari asumsi `1.23` di draf. |
 | 2026-07-31 | Rate limit `mimo-v2.5-pro`: 100 RPM / 10.000.000 TPM per akun (agregat semua API key). Pricing overseas: input cache-miss $0.435/M, input cache-hit $0.0036/M (~120x lebih murah), output $0.87/M. Cache write gratis untuk waktu terbatas (bisa berubah). | Dicek langsung dari `mimo.mi.com/docs/en-US/api/guidance/rate-limit` dan `.../price/pay-as-you-go`, update terakhir per dokumentasi: Juni-Juli 2026. `LLM_CONCURRENCY` default 3 dikonfirmasi aman jauh di bawah limit 100 RPM — tidak perlu disesuaikan. Prioritas cache di Fase 4 naik karena selisih harga cache-hit vs cache-miss besar. |
